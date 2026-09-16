@@ -505,6 +505,24 @@
             transform: translateX(0);
         }
 
+        /* Embed Mode Styles - Clean standalone output for iframes */
+        body[data-embed="true"] .app-header,
+        body[data-embed="true"] .sidebar,
+        body[data-embed="true"] .app-footer,
+        body[data-embed="true"] #panel-editor,
+        body[data-embed="true"] .resizer {
+            display: none !important;
+        }
+        body[data-embed="true"] .workspace {
+            padding: 0 !important;
+            gap: 0 !important;
+        }
+        body[data-embed="true"] #panel-preview {
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+        }
+
         @media (max-width: 768px) {
             body { flex-direction: column; }
             .app-body { flex-direction: column; }
@@ -617,6 +635,33 @@
         </div>
     </div>
 
+    <!-- Share & Embed Modal -->
+    <div class="modal-overlay" id="share-modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <button class="modal-close" id="share-modal-close">
+                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+            </button>
+            <h2 class="modal-title">Share & Embed Workspace</h2>
+            <p class="modal-subtitle">Share your live preview link or grab the iframe code to embed it anywhere.</p>
+            
+            <div style="margin-bottom: 1.25rem;">
+                <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">Direct Link</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" class="form-input" id="share-url-input" readonly style="margin-bottom: 0;">
+                    <button class="btn-primary" id="btn-copy-url" style="width: auto; padding: 0 1.25rem; white-space: nowrap;">Copy Link</button>
+                </div>
+            </div>
+
+            <div>
+                <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">Embed Code (HTML iframe)</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" class="form-input" id="share-embed-input" readonly style="margin-bottom: 0; font-family: var(--font-code); font-size: 11px;">
+                    <button class="btn-primary" id="btn-copy-embed" style="width: auto; padding: 0 1.25rem; white-space: nowrap;">Copy Embed</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="notification-container" id="notification-container"></div>
 
     <script type="module">
@@ -649,7 +694,13 @@
             headerActionBtn: document.getElementById('header-action-btn'),
             headerGreeting: document.getElementById('header-greeting'),
             footerTime: document.getElementById('footer-time'),
-            footerCopyright: document.getElementById('footer-copyright')
+            footerCopyright: document.getElementById('footer-copyright'),
+            shareModal: document.getElementById('share-modal'),
+            shareModalClose: document.getElementById('share-modal-close'),
+            shareUrlInput: document.getElementById('share-url-input'),
+            shareEmbedInput: document.getElementById('share-embed-input'),
+            btnCopyUrl: document.getElementById('btn-copy-url'),
+            btnCopyEmbed: document.getElementById('btn-copy-embed')
         };
 
         let isDarkMode = true;
@@ -657,7 +708,7 @@
         let typingTimer;
         let syncTimer;
         let isLoadedFromCloud = false;
-        let isDragging = false;
+        let isDraggingState = false;
 
         const handleShare = () => {
             if (!elements.input) return;
@@ -665,18 +716,30 @@
                 const code = elements.input.value;
                 const encoded = btoa(encodeURIComponent(code));
                 const shareUrl = `${window.location.origin}${window.location.pathname}#code=${encoded}`;
-                
-                document.execCommand ? copyToClipboardFallback(shareUrl) : navigator.clipboard.writeText(shareUrl).then(() => {
-                    showNotification("Share link copied to clipboard!");
-                }).catch(() => {
-                    copyToClipboardFallback(shareUrl);
-                });
+                const embedUrl = `${window.location.origin}${window.location.pathname}?embed=true#code=${encoded}`;
+                const embedCode = `<iframe src="${embedUrl}" width="100%" height="450px" style="border:1px solid var(--border-color); border-radius:var(--radius-lg); background:var(--bg-panel);" sandbox="allow-scripts allow-same-origin"></iframe>`;
+
+                if (elements.shareUrlInput) elements.shareUrlInput.value = shareUrl;
+                if (elements.shareEmbedInput) elements.shareEmbedInput.value = embedCode;
+                if (elements.shareModal) elements.shareModal.classList.add('active');
             } catch (err) {
                 showNotification("Failed to generate share link.", "error");
             }
         };
 
-        const copyToClipboardFallback = (text) => {
+        const copyTextToClipboard = (text, successMsg) => {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showNotification(successMsg);
+                }).catch(() => {
+                    copyToClipboardFallback(text, successMsg);
+                });
+            } else {
+                copyToClipboardFallback(text, successMsg);
+            }
+        };
+
+        const copyToClipboardFallback = (text, successMsg) => {
             const textarea = document.createElement('textarea');
             textarea.value = text;
             textarea.style.position = 'fixed';
@@ -685,9 +748,9 @@
             textarea.select();
             try {
                 document.execCommand('copy');
-                showNotification("Share link copied to clipboard!");
+                showNotification(successMsg);
             } catch (err) {
-                showNotification("Could not copy link.", "error");
+                showNotification("Could not copy to clipboard.", "error");
             }
             document.body.removeChild(textarea);
         };
@@ -862,6 +925,12 @@
         };
 
         const loadUrlState = () => {
+            // Check if embed mode is requested via query param
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('embed') === 'true') {
+                document.body.setAttribute('data-embed', 'true');
+            }
+
             if (!elements.input) return false;
             if (window.location.hash.startsWith('#code=')) {
                 try {
@@ -925,6 +994,34 @@
         const shareBtn = document.getElementById('btn-share');
         if (shareBtn) {
             shareBtn.addEventListener('click', handleShare);
+        }
+
+        if (elements.shareModalClose) {
+            elements.shareModalClose.addEventListener('click', () => {
+                if (elements.shareModal) elements.shareModal.classList.remove('active');
+            });
+        }
+
+        if (elements.shareModal) {
+            elements.shareModal.addEventListener('click', (e) => {
+                if (e.target === elements.shareModal) elements.shareModal.classList.remove('active');
+            });
+        }
+
+        if (elements.btnCopyUrl) {
+            elements.btnCopyUrl.addEventListener('click', () => {
+                if (elements.shareUrlInput) {
+                    copyTextToClipboard(elements.shareUrlInput.value, "Direct link copied to clipboard!");
+                }
+            });
+        }
+
+        if (elements.btnCopyEmbed) {
+            elements.btnCopyEmbed.addEventListener('click', () => {
+                if (elements.shareEmbedInput) {
+                    copyTextToClipboard(elements.shareEmbedInput.value, "Embed code copied to clipboard!");
+                }
+            });
         }
 
         if (elements.headerActionBtn) {
@@ -1009,7 +1106,6 @@
             });
         }
 
-        let isDraggingState = false;
         const startDrag = () => {
             isDraggingState = true;
             document.body.style.cursor = window.innerWidth > 768 ? 'col-resize' : 'row-resize';
