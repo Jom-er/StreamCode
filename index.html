@@ -645,13 +645,21 @@
                 <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"></path></svg>
             </button>
             <h2 class="modal-title">Share & Embed Workspace</h2>
-            <p class="modal-subtitle">Share your short live preview link or grab the iframe code to embed it anywhere.</p>
+            <p class="modal-subtitle">Share your super short link, Discord markdown, or embed code.</p>
             
             <div style="margin-bottom: 1.25rem;">
-                <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">Short Link</label>
+                <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">Super Short Link</label>
                 <div style="display: flex; gap: 8px;">
                     <input type="text" class="form-input" id="share-url-input" readonly style="margin-bottom: 0;">
                     <button class="btn-primary" id="btn-copy-url" style="width: auto; padding: 0 1.25rem; white-space: nowrap;">Copy Link</button>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 1.25rem;">
+                <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">Discord Format (Markdown)</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" class="form-input" id="share-discord-input" readonly style="margin-bottom: 0;">
+                    <button class="btn-primary" id="btn-copy-discord" style="width: auto; padding: 0 1.25rem; white-space: nowrap;">Copy Discord</button>
                 </div>
             </div>
 
@@ -700,8 +708,10 @@
             shareModal: document.getElementById('share-modal'),
             shareModalClose: document.getElementById('share-modal-close'),
             shareUrlInput: document.getElementById('share-url-input'),
+            shareDiscordInput: document.getElementById('share-discord-input'),
             shareEmbedInput: document.getElementById('share-embed-input'),
             btnCopyUrl: document.getElementById('btn-copy-url'),
+            btnCopyDiscord: document.getElementById('btn-copy-discord'),
             btnCopyEmbed: document.getElementById('btn-copy-embed')
         };
 
@@ -720,35 +730,34 @@
             
             try {
                 const code = elements.input.value;
-                // Ultra-short 5-character alphanumeric ID for maximum conciseness
                 const shareId = Math.random().toString(36).substring(2, 7);
                 
                 let shareUrl = '';
                 let embedUrl = '';
-
-                // Use clean root base URL without runtime UUID paths
                 const baseUrl = `${window.location.protocol}//${window.location.host}/`;
+
+                // Save locally so offline/fallback share links remain super short
+                try {
+                    localStorage.setItem(`streamcode_share_${shareId}`, code);
+                } catch(e) {}
 
                 if (isDbReady && db) {
                     try {
                         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shares', shareId);
                         await setDoc(docRef, { code: code, createdAt: Date.now() });
-                        shareUrl = `${baseUrl}?v=${shareId}`;
-                        embedUrl = `${baseUrl}?embed=true&v=${shareId}`;
                     } catch (e) {
-                        const compressed = LZString.compressToEncodedURIComponent(code);
-                        shareUrl = `${baseUrl}?c=${compressed}`;
-                        embedUrl = `${baseUrl}?embed=true&c=${compressed}`;
+                        console.error("Firestore sync fallback to local storage", e);
                     }
-                } else {
-                    const compressed = LZString.compressToEncodedURIComponent(code);
-                    shareUrl = `${baseUrl}?c=${compressed}`;
-                    embedUrl = `${baseUrl}?embed=true&c=${compressed}`;
                 }
 
+                shareUrl = `${baseUrl}?v=${shareId}`;
+                embedUrl = `${baseUrl}?embed=true&v=${shareId}`;
+
                 const embedCode = `<iframe src="${embedUrl}" width="100%" height="450px" style="border:1px solid var(--border-color); border-radius:var(--radius-lg); background:var(--bg-panel);" sandbox="allow-scripts allow-same-origin"></iframe>`;
+                const discordMarkdown = `[🚀 Check out my StreamCode workspace!](${shareUrl})`;
 
                 if (elements.shareUrlInput) elements.shareUrlInput.value = shareUrl;
+                if (elements.shareDiscordInput) elements.shareDiscordInput.value = discordMarkdown;
                 if (elements.shareEmbedInput) elements.shareEmbedInput.value = embedCode;
                 if (elements.shareModal) elements.shareModal.classList.add('active');
             } catch (err) {
@@ -967,9 +976,20 @@
 
             if (!elements.input) return false;
 
-            // Handle short ID query parameter format (?v=xyz)
             const vId = urlParams.get('v') || urlParams.get('id');
             if (vId) {
+                // Check local storage first for instant super short link resolution
+                try {
+                    const localCode = localStorage.getItem(`streamcode_share_${vId}`);
+                    if (localCode) {
+                        elements.input.value = localCode;
+                        isLoadedFromCloud = true;
+                        handleInput();
+                        showNotification("Loaded shared snippet successfully!");
+                        return true;
+                    }
+                } catch(e) {}
+
                 try {
                     if (db) {
                         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shares', vId);
@@ -989,7 +1009,7 @@
                 return false;
             }
 
-            // Handle LZString compressed query param (?c=...) or legacy hash format
+            // Legacy fallback support for compressed or base64 hashes
             const cParam = urlParams.get('c') || (window.location.hash.startsWith('#c=') ? window.location.hash.substring(3) : null);
             if (cParam) {
                 try {
@@ -1006,7 +1026,6 @@
                 }
             }
 
-            // Fallback for legacy base64 format (#code=...)
             if (window.location.hash.startsWith('#code=')) {
                 try {
                     elements.input.value = decodeURIComponent(atob(window.location.hash.substring(6)));
@@ -1087,7 +1106,15 @@
         if (elements.btnCopyUrl) {
             elements.btnCopyUrl.addEventListener('click', () => {
                 if (elements.shareUrlInput) {
-                    copyTextToClipboard(elements.shareUrlInput.value, "Short link copied to clipboard!");
+                    copyTextToClipboard(elements.shareUrlInput.value, "Super short link copied to clipboard!");
+                }
+            });
+        }
+
+        if (elements.btnCopyDiscord) {
+            elements.btnCopyDiscord.addEventListener('click', () => {
+                if (elements.shareDiscordInput) {
+                    copyTextToClipboard(elements.shareDiscordInput.value, "Discord markdown copied to clipboard!");
                 }
             });
         }
@@ -1101,7 +1128,9 @@
         }
 
         if (elements.headerActionBtn) {
-            elements.headerActionBtn.addEventListener('click', () => toggleModal(true));
+            elements.headerActionBtn.addEventListener('click', () => {
+                toggleModal(true);
+            });
         }
 
         if (elements.modalClose) {
@@ -1117,112 +1146,60 @@
         if (elements.authSwitch) {
             elements.authSwitch.addEventListener('click', () => {
                 isSignUpMode = !isSignUpMode;
-                if (elements.authTitle) elements.authTitle.textContent = isSignUpMode ? "Create an account" : "Welcome back";
+                if (elements.authTitle) elements.authTitle.textContent = isSignUpMode ? "Create account" : "Welcome back";
+                if (elements.authSubtitle) elements.authSubtitle.textContent = isSignUpMode ? "Sign up to start saving and syncing your code workspaces." : "Log in to securely save and sync your workspaces across devices.";
+                if (elements.authSubmit) elements.authSubmit.textContent = isSignUpMode ? "Sign Up" : "Log In";
                 if (elements.authSwitch) elements.authSwitch.textContent = isSignUpMode ? "Already have an account? Log in" : "Don't have an account? Sign up";
                 if (elements.authMessage) elements.authMessage.style.display = 'none';
+            });
+        }
+
+        if (elements.authLogout) {
+            elements.authLogout.addEventListener('click', async () => {
+                try {
+                    await signOut(auth);
+                    toggleModal(false);
+                    showNotification("Signed out successfully.");
+                } catch (e) {
+                    showNotification("Error signing out.", "error");
+                }
             });
         }
 
         if (elements.authForm) {
             elements.authForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                if (elements.authMessage) elements.authMessage.style.display = 'none';
-                const btn = document.getElementById('auth-submit');
-                const originalText = btn ? btn.textContent : 'Submit';
-                if (btn) {
-                    btn.textContent = 'Processing...';
-                    btn.disabled = true;
-                }
+                if (!elements.email || !elements.password) return;
+                const email = elements.email.value;
+                const password = elements.password.value;
                 
+                if (elements.authMessage) elements.authMessage.style.display = 'none';
+
                 try {
-                    if (!auth) {
-                        throw new Error("Authentication service is not initialized yet. Please wait a moment.");
-                    }
                     if (isSignUpMode) {
-                        if (auth.currentUser && auth.currentUser.isAnonymous) {
-                            await signOut(auth);
-                        }
-                        await createUserWithEmailAndPassword(auth, elements.email.value, elements.password.value);
+                        await createUserWithEmailAndPassword(auth, email, password);
+                        showNotification("Account created and signed in successfully!");
                     } else {
-                        await signInWithEmailAndPassword(auth, elements.email.value, elements.password.value);
+                        await signInWithEmailAndPassword(auth, email, password);
+                        showNotification("Logged in successfully!");
                     }
                     toggleModal(false);
-                    showNotification('Successfully authenticated');
                 } catch (error) {
+                    let msg = error.message;
+                    if (error.code === 'auth/email-already-in-use') msg = 'This email is already registered. Please log in instead.';
+                    else if (error.code === 'auth/invalid-email') msg = 'Invalid email address format.';
+                    else if (error.code === 'auth/weak-password') msg = 'Password should be at least 6 characters.';
+                    else if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') msg = 'Incorrect email or password.';
+                    
                     if (elements.authMessage) {
-                        let msg = 'An error occurred. Please try again.';
-                        if (error.code === 'auth/email-already-in-use') {
-                            msg = 'This email address is already registered.';
-                        } else if (error.code === 'auth/weak-password') {
-                            msg = 'Password should be at least 6 characters long.';
-                        } else if (error.code === 'auth/invalid-email') {
-                            msg = 'Please enter a valid email address.';
-                        } else if (error.code === 'auth/invalid-credential') {
-                            msg = 'Invalid email or password.';
-                        } else if (error.message) {
-                            msg = error.message;
-                        }
                         elements.authMessage.textContent = msg;
                         elements.authMessage.style.display = 'block';
                     }
-                } finally {
-                    if (btn) {
-                        btn.textContent = originalText;
-                        btn.disabled = false;
-                    }
                 }
             });
         }
 
-        if (elements.authLogout) {
-            elements.authLogout.addEventListener('click', () => {
-                if(auth) signOut(auth);
-                toggleModal(false);
-                showNotification('Signed out');
-            });
-        }
-
-        const startDrag = () => {
-            isDraggingState = true;
-            document.body.style.cursor = window.innerWidth > 768 ? 'col-resize' : 'row-resize';
-            if (elements.frame) elements.frame.style.pointerEvents = 'none';
-        };
-
-        const doDrag = (e) => {
-            if (!isDraggingState || !elements.editorPanel) return;
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            
-            if (window.innerWidth > 768 && clientX) {
-                const newWidth = ((clientX - 64) / (window.innerWidth - 64)) * 100;
-                if (newWidth > 15 && newWidth < 85) elements.editorPanel.style.flex = `0 0 ${newWidth}%`;
-            } else if (clientY) {
-                const newHeight = ((clientY - 60) / (window.innerHeight - 60)) * 100;
-                if (newHeight > 15 && newHeight < 85) elements.editorPanel.style.flex = `0 0 ${newHeight}%`;
-            }
-        };
-
-        const stopDrag = () => {
-            if (!isDraggingState) return;
-            isDraggingState = false;
-            document.body.style.cursor = '';
-            if (elements.frame) elements.frame.style.pointerEvents = 'auto';
-        };
-
-        if (elements.resizer) {
-            elements.resizer.addEventListener('mousedown', startDrag);
-            elements.resizer.addEventListener('touchstart', startDrag, {passive: true});
-        }
-        document.addEventListener('mousemove', doDrag);
-        document.addEventListener('touchmove', doDrag, {passive: true});
-        document.addEventListener('mouseup', stopDrag);
-        document.addEventListener('touchend', stopDrag);
-
-        window.addEventListener('resize', () => {
-            if (elements.editorPanel) elements.editorPanel.style.flex = ''; 
-        });
-
-        handleInput();
+        // Initialize Firebase connection
         setupFirebase();
     </script>
 </body>
