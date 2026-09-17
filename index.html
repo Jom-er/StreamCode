@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StreamCode</title>
+    <title>StreamCode IDE</title>
     <!-- LZ-String for compact URL compression -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
@@ -622,6 +622,14 @@
                 height: 4px;
             }
         }
+
+        @media screen and (max-width: 768px) {
+          /* Mobile layout styles */
+          .nav-container {
+            flex-direction: column;
+            width: 100%;
+          }
+        }
     </style>
 </head>
 <body data-theme="dark">
@@ -950,7 +958,6 @@
             try {
                 let config = {};
                 
-                // FIXED: Robust configuration parsing to prevent crashing if config is already an object[cite: 1]
                 if (typeof __firebase_config !== 'undefined') {
                     try {
                         config = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
@@ -959,11 +966,10 @@
                     }
                 }
 
-                // FIXED: Validate that config contains keys before initializing to prevent uninitialized errors[cite: 1]
                 if (!config || Object.keys(config).length === 0) {
                     console.log("StreamCode: Firebase config missing. Running in local-only mode.");
                     loadUrlState();
-                    return; // Abort Firebase setup, proceed locally without error spam[cite: 1]
+                    return; 
                 }
 
                 const app = initializeApp(config);
