@@ -580,7 +580,9 @@
         body[data-embed="true"] .sidebar,
         body[data-embed="true"] .app-footer,
         body[data-embed="true"] #panel-editor,
-        body[data-embed="true"] .resizer {
+        body[data-embed="true"] .resizer,
+        body[data-embed="true"] .panel-header,
+        body[data-embed="true"] .console-drawer {
             display: none !important;
         }
         body[data-embed="true"] .workspace {
@@ -883,7 +885,9 @@
                 
                 let shareUrl = '';
                 let embedUrl = '';
-                const baseUrl = `${window.location.protocol}//${window.location.host}/`;
+                
+                // FIXED: Hardcoded base URL to your public GitHub pages repository
+                const baseUrl = 'https://jom-er.github.io/StreamCode/';
 
                 try {
                     localStorage.setItem(`streamcode_share_${shareId}`, code);
@@ -898,7 +902,7 @@
                     }
                 }
 
-                shareUrl = `${baseUrl}?v=${shareId}`;
+                shareUrl = `${baseUrl}?preview=true&v=${shareId}`;
                 embedUrl = `${baseUrl}?embed=true&v=${shareId}`;
 
                 const embedCode = `<iframe src="${embedUrl}" width="100%" height="450px" style="border:1px solid var(--border-color); border-radius:var(--radius-lg); background:var(--bg-panel);" sandbox="allow-scripts allow-same-origin"></iframe>`;
@@ -1159,7 +1163,7 @@
 
         const loadUrlState = async () => {
             const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('embed') === 'true') {
+            if (urlParams.get('embed') === 'true' || urlParams.get('preview') === 'true') {
                 document.body.setAttribute('data-embed', 'true');
             }
 
