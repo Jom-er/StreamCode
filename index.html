@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StreamCode IDE</title>
+    <title>StreamCode</title>
     <!-- LZ-String for compact URL compression -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
@@ -576,6 +576,90 @@
             transform: translateX(0);
         }
 
+        .discord-embed {
+            background-color: #2b2d31;
+            border-radius: 4px;
+            border-left: 4px solid var(--accent);
+            padding: 1rem;
+            margin-top: 1rem;
+            font-family: 'Inter', sans-serif;
+            color: #dbdee1;
+            text-align: left;
+        }
+        .discord-embed-provider {
+            font-size: 0.75rem;
+            margin-bottom: 4px;
+            color: #b5bac1;
+        }
+        .discord-embed-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #00a8fc;
+            margin-bottom: 12px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .discord-embed-title:hover { text-decoration: underline; }
+        .discord-embed-media-container {
+            position: relative;
+            border-radius: 4px;
+            overflow: hidden;
+            background-color: #1e1f22;
+            border: 1px solid #1e1f22;
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 16/9;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        .discord-embed-media-container.expanded {
+            max-width: 100%;
+            height: 350px;
+            aspect-ratio: auto;
+            cursor: default;
+        }
+        .discord-embed-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            z-index: 2;
+        }
+        .discord-embed-media-container:hover .discord-embed-overlay {
+            background: rgba(0,0,0,0.5);
+        }
+        .discord-play-btn {
+            width: 50px;
+            height: 50px;
+            background: rgba(0,0,0,0.6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease;
+        }
+        .discord-embed-media-container:hover .discord-play-btn {
+            transform: scale(1.1);
+        }
+        .discord-play-btn svg {
+            fill: white;
+            width: 24px;
+            height: 24px;
+            margin-left: 4px;
+        }
+        .discord-embed-timestamp {
+            font-size: 0.75rem;
+            color: #80848e;
+            margin-top: 12px;
+        }
+
         body[data-embed="true"] .app-header,
         body[data-embed="true"] .sidebar,
         body[data-embed="true"] .app-footer,
@@ -772,6 +856,28 @@
                     <button class="btn-primary" id="btn-copy-embed" style="width: auto; padding: 0 1.25rem; white-space: nowrap;">Copy Embed</button>
                 </div>
             </div>
+
+            <div style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">Link Preview</label>
+                
+                <div class="discord-embed">
+                    <div class="discord-embed-provider">StreamCode IDE</div>
+                    <div class="discord-embed-title" id="discord-embed-title">StreamCode Workspace</div>
+                    
+                    <div class="discord-embed-media-container" id="discord-embed-media">
+                        <div class="discord-embed-overlay" id="discord-embed-overlay">
+                            <div class="discord-play-btn">
+                                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                            </div>
+                        </div>
+                        <iframe id="discord-embed-iframe" style="width: 100%; height: 100%; border: none; display: none; pointer-events: none; background: #ffffff;" sandbox="allow-scripts allow-same-origin"></iframe>
+                        <div id="discord-embed-placeholder" style="width: 100%; height: 100%; background: #1e1f22; display: flex; align-items: center; justify-content: center; color: #80848e; font-family: var(--font-code); font-size: 12px;">Click to interact</div>
+                    </div>
+                    
+                    <div class="discord-embed-timestamp" id="discord-embed-timestamp">Today at 12:00 PM</div>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -819,7 +925,13 @@
             shareEmbedInput: document.getElementById('share-embed-input'),
             btnCopyUrl: document.getElementById('btn-copy-url'),
             btnCopyDiscord: document.getElementById('btn-copy-discord'),
-            btnCopyEmbed: document.getElementById('btn-copy-embed')
+            btnCopyEmbed: document.getElementById('btn-copy-embed'),
+            embedMedia: document.getElementById('discord-embed-media'),
+            embedOverlay: document.getElementById('discord-embed-overlay'),
+            embedPlaceholder: document.getElementById('discord-embed-placeholder'),
+            embedIframe: document.getElementById('discord-embed-iframe'),
+            embedTimestamp: document.getElementById('discord-embed-timestamp'),
+            embedTitle: document.getElementById('discord-embed-title')
         };
 
         let isDarkMode = true;
@@ -900,17 +1012,26 @@
                     localStorage.setItem(`streamcode_share_${shareId}`, code);
                 } catch(e) {}
 
+                let savedToCloud = false;
+
                 if (isDbReady && db) {
                     try {
                         const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shares', shareId);
                         await setDoc(docRef, { code: code, createdAt: Date.now() });
+                        savedToCloud = true;
                     } catch (e) {
-                        console.error("Firestore sync fallback to local storage", e);
+                        console.error("Firestore sync fallback to URL payload", e);
                     }
                 }
 
-                shareUrl = `${baseUrl}?preview=true&v=${shareId}`;
-                embedUrl = `${baseUrl}?embed=true&v=${shareId}`;
+                if (savedToCloud) {
+                    shareUrl = `${baseUrl}?preview=true&v=${shareId}`;
+                    embedUrl = `${baseUrl}?embed=true&v=${shareId}`;
+                } else {
+                    const compressed = LZString.compressToEncodedURIComponent(code);
+                    shareUrl = `${baseUrl}?preview=true&c=${compressed}`;
+                    embedUrl = `${baseUrl}?embed=true&c=${compressed}`;
+                }
 
                 const embedCode = `<iframe src="${embedUrl}" width="100%" height="450px" style="border:1px solid var(--border-color); border-radius:var(--radius-lg); background:var(--bg-panel);" sandbox="allow-scripts allow-same-origin"></iframe>`;
                 const discordMarkdown = `[🚀 Check out my StreamCode workspace!](${shareUrl})`;
@@ -918,6 +1039,27 @@
                 if (elements.shareUrlInput) elements.shareUrlInput.value = shareUrl;
                 if (elements.shareDiscordInput) elements.shareDiscordInput.value = discordMarkdown;
                 if (elements.shareEmbedInput) elements.shareEmbedInput.value = embedCode;
+                
+                if (elements.embedTitle) elements.embedTitle.textContent = `Watch ${shareId} | StreamCode`;
+                if (elements.embedTimestamp) {
+                    const now = new Date();
+                    elements.embedTimestamp.textContent = now.toLocaleDateString() + ', ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                }
+                if (elements.embedIframe) {
+                    // Update iframe src with the current preview
+                    elements.embedIframe.src = elements.frame.src;
+                }
+                if (elements.embedMedia) {
+                    // Reset to unexpanded thumbnail view
+                    elements.embedMedia.classList.remove('expanded');
+                    if (elements.embedOverlay) elements.embedOverlay.style.display = 'flex';
+                    if (elements.embedPlaceholder) elements.embedPlaceholder.style.display = 'flex';
+                    if (elements.embedIframe) {
+                        elements.embedIframe.style.display = 'none';
+                        elements.embedIframe.style.pointerEvents = 'none';
+                    }
+                }
+
                 if (elements.shareModal) elements.shareModal.classList.add('active');
             } catch (err) {
                 showNotification("Failed to generate share link.", "error");
@@ -1365,6 +1507,20 @@
             elements.btnCopyEmbed.addEventListener('click', () => {
                 if (elements.shareEmbedInput) {
                     copyTextToClipboard(elements.shareEmbedInput.value, "Embed code copied to clipboard!");
+                }
+            });
+        }
+
+        if (elements.embedMedia) {
+            elements.embedMedia.addEventListener('click', function() {
+                if (!this.classList.contains('expanded')) {
+                    this.classList.add('expanded');
+                    if (elements.embedOverlay) elements.embedOverlay.style.display = 'none';
+                    if (elements.embedPlaceholder) elements.embedPlaceholder.style.display = 'none';
+                    if (elements.embedIframe) {
+                        elements.embedIframe.style.display = 'block';
+                        elements.embedIframe.style.pointerEvents = 'auto'; // allow interaction with output
+                    }
                 }
             });
         }
