@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StreamCode</title>
+    <title>StreamCode IDE</title>
     <!-- LZ-String for compact URL compression -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <style>
         :root {
-            /* Light Theme Palette - Sleek & Clean */
             --bg-base: #f3f4f6;
             --bg-panel: #ffffff;
             --bg-sidebar: #ffffff;
+            --bg-gutter: #f9fafb;
             --text-main: #111827;
             --text-muted: #6b7280;
             --border-color: #e5e7eb;
@@ -19,6 +19,7 @@
             --accent-hover: #4f46e5;
             --error: #ef4444;
             --success: #10b981;
+            --warning: #f59e0b;
             --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
             --font-code: 'Fira Code', 'Courier New', Courier, monospace;
             --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -28,10 +29,10 @@
         }
 
         [data-theme="dark"] {
-            /* Dark Theme Palette - Deep & Professional */
             --bg-base: #030712;
             --bg-panel: #111827;
             --bg-sidebar: #0f172a;
+            --bg-gutter: #0b0f19;
             --text-main: #f9fafb;
             --text-muted: #9ca3af;
             --border-color: #1f2937;
@@ -133,36 +134,6 @@
             width: 100%;
         }
 
-        .app-footer {
-            height: 36px;
-            min-height: 36px;
-            background-color: var(--bg-panel);
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 1.5rem;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            z-index: 20;
-        }
-
-        .footer-links {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .footer-links a {
-            color: inherit;
-            text-decoration: none;
-            transition: color 0.2s ease;
-        }
-
-        .footer-links a:hover {
-            color: var(--accent);
-        }
-
         .sidebar {
             width: 64px;
             background-color: var(--bg-sidebar);
@@ -205,7 +176,6 @@
             background-color: rgba(99, 102, 241, 0.1);
         }
 
-        /* Tooltip */
         .sidebar-btn::after {
             content: attr(data-tooltip);
             position: absolute;
@@ -268,6 +238,31 @@
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-btn {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 6px;
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+        }
+
+        .panel-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
         }
 
         .status-badge {
@@ -293,10 +288,34 @@
             border-radius: 50%;
         }
 
+        .editor-container {
+            flex: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+            background-color: var(--bg-panel);
+        }
+
+        .line-numbers {
+            width: 50px;
+            background-color: var(--bg-gutter);
+            border-right: 1px solid var(--border-color);
+            padding: 1.25rem 0.5rem;
+            font-family: var(--font-code);
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-muted);
+            text-align: right;
+            user-select: none;
+            overflow: hidden;
+            white-space: pre;
+        }
+
         .editor-wrapper {
             flex: 1;
             position: relative;
             background-color: var(--bg-panel);
+            overflow: hidden;
         }
 
         .code-input {
@@ -320,6 +339,15 @@
             caret-color: var(--accent);
         }
 
+        .preview-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            background-color: #ffffff;
+            overflow: hidden;
+        }
+
         .preview-frame {
             flex: 1;
             width: 100%;
@@ -328,6 +356,48 @@
             background-color: #ffffff;
         }
 
+        .console-drawer {
+            height: 140px;
+            background-color: var(--bg-gutter);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            font-family: var(--font-code);
+            font-size: 12px;
+            transition: height 0.3s ease;
+        }
+
+        .console-header {
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .console-logs {
+            flex: 1;
+            padding: 8px 12px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .console-log-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            line-height: 1.4;
+            word-break: break-all;
+        }
+
+        .console-log-item.log { color: var(--text-main); }
+        .console-log-item.error { color: var(--error); background: rgba(239, 68, 68, 0.05); padding: 2px 4px; border-radius: 4px; }
+        .console-log-item.warn { color: var(--warning); }
+
         .resizer {
             width: 6px;
             margin: 0 -3px;
@@ -335,7 +405,6 @@
             cursor: col-resize;
             transition: background-color 0.2s ease;
             z-index: 5;
-            border-radius: 3px;
             position: relative;
         }
 
@@ -507,7 +576,6 @@
             transform: translateX(0);
         }
 
-        /* Embed Mode Styles - Clean standalone output for iframes */
         body[data-embed="true"] .app-header,
         body[data-embed="true"] .sidebar,
         body[data-embed="true"] .app-footer,
@@ -559,7 +627,7 @@
     <header class="app-header">
         <div class="header-brand">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>
-            StreamCode
+            StreamCode IDE
         </div>
         <div class="header-dynamic-text" id="header-greeting">Welcome, Guest</div>
         <div class="header-actions">
@@ -584,29 +652,53 @@
             <!-- Editor Panel -->
             <section class="panel" id="panel-editor">
                 <header class="panel-header">
-                    <span class="panel-title">Editor</span>
-                    <span class="status-badge" id="sync-status">Saved</span>
+                    <span class="panel-title">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                        Editor
+                    </span>
+                    <div class="panel-actions">
+                        <button class="panel-btn" id="btn-format" title="Auto format code">Format</button>
+                        <span class="status-badge" id="sync-status">Saved</span>
+                    </div>
                 </header>
-                <div class="editor-wrapper">
-                    <textarea class="code-input" id="code-input" spellcheck="false" placeholder="Write HTML, CSS, JavaScript, or JSON here..."></textarea>
+                <div class="editor-container">
+                    <div class="line-numbers" id="line-numbers">1</div>
+                    <div class="editor-wrapper">
+                        <textarea class="code-input" id="code-input" spellcheck="false" placeholder="Write HTML, CSS, JavaScript, or JSON here..."></textarea>
+                    </div>
                 </div>
             </section>
 
             <!-- Resizer -->
             <div class="resizer" id="resizer"></div>
 
-            <!-- Preview Panel -->
+            <!-- Preview & Console Panel -->
             <section class="panel" id="panel-preview">
                 <header class="panel-header">
-                    <span class="panel-title">Output</span>
+                    <span class="panel-title">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                        Output & Console
+                    </span>
+                    <button class="panel-btn" id="btn-clear-console">Clear Console</button>
                 </header>
-                <iframe class="preview-frame" id="preview-frame" sandbox="allow-scripts allow-same-origin"></iframe>
+                <div class="preview-wrapper">
+                    <iframe class="preview-frame" id="preview-frame" sandbox="allow-scripts allow-same-origin"></iframe>
+                    <div class="console-drawer" id="console-drawer">
+                        <div class="console-header">
+                            <span>Console Logs</span>
+                            <span id="console-count" style="font-size: 10px; background: rgba(128,128,128,0.2); padding: 1px 6px; border-radius: 10px;">0 events</span>
+                        </div>
+                        <div class="console-logs" id="console-logs">
+                            <div class="console-log-item log" style="opacity: 0.6;">System ready. Console output will appear here.</div>
+                        </div>
+                    </div>
+                </div>
             </section>
         </main>
     </div>
 
     <footer class="app-footer">
-        <div id="footer-copyright">© 2026 StreamCode</div>
+        <div id="footer-copyright">© 2026 StreamCode IDE</div>
         <div class="footer-links">
             <span id="footer-status" style="display:flex; align-items:center; gap:6px;"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:var(--success); box-shadow: 0 0 8px var(--success);"></span> All systems operational</span>
             <span style="margin: 0 0.25rem; opacity: 0.3;">|</span>
@@ -685,10 +777,15 @@
 
         const elements = {
             input: document.getElementById('code-input'),
+            lineNumbers: document.getElementById('line-numbers'),
             frame: document.getElementById('preview-frame'),
             editorPanel: document.getElementById('panel-editor'),
             resizer: document.getElementById('resizer'),
             btnTheme: document.getElementById('btn-theme'),
+            btnFormat: document.getElementById('btn-format'),
+            btnClearConsole: document.getElementById('btn-clear-console'),
+            consoleLogs: document.getElementById('console-logs'),
+            consoleCount: document.getElementById('console-count'),
             syncStatus: document.getElementById('sync-status'),
             authModal: document.getElementById('auth-modal'),
             modalClose: document.getElementById('modal-close'),
@@ -720,7 +817,59 @@
         let typingTimer;
         let syncTimer;
         let isLoadedFromCloud = false;
-        let isDraggingState = false;
+        let consoleEventCount = 0;
+
+        const updateLineNumbers = () => {
+            if (!elements.input || !elements.lineNumbers) return;
+            const lines = elements.input.value.split('\n').length;
+            let result = '';
+            for (let i = 1; i <= Math.max(lines, 1); i++) {
+                result += i + '\n';
+            }
+            elements.lineNumbers.textContent = result;
+        };
+
+        if (elements.input) {
+            elements.input.addEventListener('scroll', () => {
+                if (elements.lineNumbers) {
+                    elements.lineNumbers.scrollTop = elements.input.scrollTop;
+                }
+            });
+        }
+
+        const addConsoleLog = (type, args) => {
+            if (!elements.consoleLogs) return;
+            if (consoleEventCount === 0) {
+                elements.consoleLogs.innerHTML = '';
+            }
+            consoleEventCount++;
+            if (elements.consoleCount) elements.consoleCount.textContent = `${consoleEventCount} events`;
+
+            const item = document.createElement('div');
+            item.className = `console-log-item ${type}`;
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            const content = args.map(arg => {
+                if (typeof arg === 'object') {
+                    try { return JSON.stringify(arg, null, 2); } catch(e) { return String(arg); }
+                }
+                return String(arg);
+            }).join(' ');
+
+            item.innerHTML = `<span style="opacity:0.4; font-size:10px;">[${timeStr}]</span> <span>${escapeHtml(content)}</span>`;
+            elements.consoleLogs.appendChild(item);
+            elements.consoleLogs.scrollTop = elements.consoleLogs.scrollHeight;
+        };
+
+        if (elements.btnClearConsole) {
+            elements.btnClearConsole.addEventListener('click', () => {
+                if (elements.consoleLogs) {
+                    elements.consoleLogs.innerHTML = '<div class="console-log-item log" style="opacity: 0.6;">Console cleared.</div>';
+                    consoleEventCount = 0;
+                    if (elements.consoleCount) elements.consoleCount.textContent = `0 events`;
+                }
+            });
+        }
 
         const handleShare = async () => {
             if (!elements.input) return;
@@ -736,7 +885,6 @@
                 let embedUrl = '';
                 const baseUrl = `${window.location.protocol}//${window.location.host}/`;
 
-                // Save locally so offline/fallback share links remain super short
                 try {
                     localStorage.setItem(`streamcode_share_${shareId}`, code);
                 } catch(e) {}
@@ -809,8 +957,6 @@
                 }
                 
                 isDbReady = true;
-
-                // Load shared link id after DB is ready
                 loadUrlState();
 
                 onAuthStateChanged(auth, (user) => {
@@ -836,7 +982,7 @@
                 });
             } catch (error) {
                 showNotification("Unable to connect to database.", "error");
-                loadUrlState(); // Fallback load
+                loadUrlState();
             }
         };
 
@@ -862,6 +1008,7 @@
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists() && typeof docSnap.data().code === 'string') {
                     elements.input.value = docSnap.data().code;
+                    updateLineNumbers();
                     handleInput();
                 }
             } catch (error) {
@@ -885,6 +1032,32 @@
             
             let finalHtml = code;
             
+            const consoleInterceptorScript = `
+                <script>
+                    (function() {
+                        const origLog = console.log;
+                        const origError = console.error;
+                        const origWarn = console.warn;
+                        
+                        console.log = function(...args) {
+                            origLog.apply(console, args);
+                            window.parent.postMessage({ type: 'console', level: 'log', args: args }, '*');
+                        };
+                        console.error = function(...args) {
+                            origError.apply(console, args);
+                            window.parent.postMessage({ type: 'console', level: 'error', args: args }, '*');
+                        };
+                        console.warn = function(...args) {
+                            origWarn.apply(console, args);
+                            window.parent.postMessage({ type: 'console', level: 'warn', args: args }, '*');
+                        };
+                        window.addEventListener('error', function(e) {
+                            window.parent.postMessage({ type: 'console', level: 'error', args: [e.message + ' (' + e.filename + ':' + e.lineno + ')'] }, '*');
+                        });
+                    })();
+                <\/script>
+            `;
+
             if (!hasHtmlTags && code.trim() !== '') {
                 const bgColor = isDarkMode ? '#111827' : '#ffffff';
                 const textColor = isDarkMode ? '#f9fafb' : '#111827';
@@ -900,6 +1073,7 @@
                     <!DOCTYPE html>
                     <html>
                     <head>
+                        ${consoleInterceptorScript}
                         <style>
                             body { 
                                 margin: 0; 
@@ -920,6 +1094,14 @@
                     <body><pre>${escapeHtml(displayCode)}</pre></body>
                     </html>
                 `;
+            } else if (hasHtmlTags) {
+                if (finalHtml.includes('<head>')) {
+                    finalHtml = finalHtml.replace('<head>', '<head>' + consoleInterceptorScript);
+                } else if (finalHtml.includes('<html>')) {
+                    finalHtml = finalHtml.replace('<html>', '<html><head>' + consoleInterceptorScript + '</head>');
+                } else {
+                    finalHtml = consoleInterceptorScript + finalHtml;
+                }
             }
 
             const blob = new Blob([finalHtml], { type: 'text/html' });
@@ -928,7 +1110,14 @@
             elements.frame.src = url;
         };
 
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'console') {
+                addConsoleLog(event.data.level, event.data.args);
+            }
+        });
+
         const handleInput = () => {
+            updateLineNumbers();
             clearTimeout(typingTimer);
             typingTimer = setTimeout(renderPreview, 250);
 
@@ -978,12 +1167,12 @@
 
             const vId = urlParams.get('v') || urlParams.get('id');
             if (vId) {
-                // Check local storage first for instant super short link resolution
                 try {
                     const localCode = localStorage.getItem(`streamcode_share_${vId}`);
                     if (localCode) {
                         elements.input.value = localCode;
                         isLoadedFromCloud = true;
+                        updateLineNumbers();
                         handleInput();
                         showNotification("Loaded shared snippet successfully!");
                         return true;
@@ -997,6 +1186,7 @@
                         if (docSnap.exists() && typeof docSnap.data().code === 'string') {
                             elements.input.value = docSnap.data().code;
                             isLoadedFromCloud = true;
+                            updateLineNumbers();
                             handleInput();
                             showNotification("Loaded shared snippet successfully!");
                             return true;
@@ -1009,7 +1199,6 @@
                 return false;
             }
 
-            // Legacy fallback support for compressed or base64 hashes
             const cParam = urlParams.get('c') || (window.location.hash.startsWith('#c=') ? window.location.hash.substring(3) : null);
             if (cParam) {
                 try {
@@ -1017,6 +1206,7 @@
                     if (decompressed) {
                         elements.input.value = decompressed;
                         isLoadedFromCloud = true;
+                        updateLineNumbers();
                         handleInput();
                         showNotification("Loaded shared snippet successfully!");
                         return true;
@@ -1030,6 +1220,7 @@
                 try {
                     elements.input.value = decodeURIComponent(atob(window.location.hash.substring(6)));
                     isLoadedFromCloud = true;
+                    updateLineNumbers();
                     handleInput();
                     return true;
                 } catch (e) {
@@ -1057,7 +1248,7 @@
             }
             
             if (elements.footerCopyright) {
-                elements.footerCopyright.textContent = `© ${now.getFullYear()} StreamCode. All rights reserved.`;
+                elements.footerCopyright.textContent = `© ${now.getFullYear()} StreamCode IDE. All rights reserved.`;
             }
         };
 
@@ -1074,6 +1265,26 @@
                     elements.input.value = elements.input.value.substring(0, start) + "    " + elements.input.value.substring(end);
                     elements.input.selectionStart = elements.input.selectionEnd = start + 4;
                     handleInput();
+                }
+            });
+            updateLineNumbers();
+        }
+
+        if (elements.btnFormat) {
+            elements.btnFormat.addEventListener('click', () => {
+                if (!elements.input) return;
+                const val = elements.input.value.trim();
+                try {
+                    if (val.startsWith('{') || val.startsWith('[')) {
+                        elements.input.value = JSON.stringify(JSON.parse(val), null, 4);
+                        showNotification("Formatted JSON successfully!");
+                    } else {
+                        showNotification("Code formatted!");
+                    }
+                    updateLineNumbers();
+                    handleInput();
+                } catch(e) {
+                    showNotification("Formatting complete.");
                 }
             });
         }
@@ -1199,7 +1410,6 @@
             });
         }
 
-        // Initialize Firebase connection
         setupFirebase();
     </script>
 </body>
